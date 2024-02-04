@@ -29,20 +29,17 @@ async def main(keep_alive: bool = False) -> None:
     """Main."""
     use_token = all((ACCESS_TOKEN, ID_TOKEN, REFRESH_TOKEN))
     try:
-        account = token_login() if use_token else password_login()
+        pentair = token_login() if use_token else password_login()
     except Exception as ex:  # pylint: disable=broad-except
         print(ex)
         return
 
-    for key, value in account.get_tokens().items():
+    for key, value in pentair.get_tokens().items():
         set_key(ENV_PATH, key.upper(), value)
 
     # Get devices
     _selectedDeviceId = None
-    _devices = account.get_devices()
-
-    # Temp filtering to only IF3 as supported
-    _filteredDevices = filterDevicesToIF3(_devices['data'])
+    _filteredDevices = pentair.get_if3_devices()
 
     _deviceCount = len(_filteredDevices)
     if _deviceCount == 0:
@@ -75,32 +72,8 @@ async def main(keep_alive: bool = False) -> None:
             while monitorPasses < 5:
                 try:
                     # Compare single device
-                    _deviceFromAPI = account.get_device(_selectedDeviceId)
-                    
-                    _activeProgramNumber = int(_deviceFromAPI['data']['fields']['s14']['value'])
-                    if _activeProgramNumber == 99:
-                        # No active program
-                        _activeProgramName = None
-                    else:
-                        _activeProgramName = _deviceFromAPI['data']['fields']['zp' + str((_activeProgramNumber+1)) + 'e2']['value']
-                    _device = {
-                        'deviceId': _deviceFromAPI['data']['deviceId'],
-                        'nickName': _deviceFromAPI['data']['productInfo']['nickName'],
-                        'model': _deviceFromAPI['data']['productInfo']['model'],
-                        'activeProgramNumber': None if _activeProgramNumber == 99 else _activeProgramNumber + 1,
-                        'activeProgramName': _activeProgramName,
-                        'enabledPrograms': [],
-                        'currentPowerConsumption': int(_deviceFromAPI['data']['fields']['s18']['value']),
-                        'currentMotorSpeed': 0 if _deviceFromAPI['data']['fields']['s19']['value'] == "0" else (int(_deviceFromAPI['data']['fields']['s19']['value'])/10),
-                        'currentEstimatedFlow': 0 if _deviceFromAPI['data']['fields']['s26']['value'] == "0" else (int(_deviceFromAPI['data']['fields']['s26']['value'])/10)
-                    }
+                    _device = pentair.get_if3_pump(_selectedDeviceId)
 
-                    for i in range(1, 9):
-                        if _deviceFromAPI['data']['fields']['zp' + str((i)) + 'e13']['value'] == "1":
-                            _device['enabledPrograms'].append({
-                                'id': i,
-                                'name': _deviceFromAPI['data']['fields']['zp' + str((i)) + 'e2']['value']
-                            })
                     diff = DeepDiff(
                         device,
                         _device,
@@ -143,23 +116,11 @@ async def main(keep_alive: bool = False) -> None:
 
             if (selectedProgramID == 0):
                 print("Stopping current program.")
-                configVariable = "zp" + str(device['activeProgramNumber']) + "e10"
-                account.update_device(_selectedDeviceId, {
-                    "payload": {
-                        configVariable: "2"
-                    }
-                })
             else:
                 print("Switching to program " + str(selectedProgramID))
-
-                configVariable = "zp" + str(selectedProgramID) + "e10"
-                account.update_device(_selectedDeviceId, {
-                    "payload": {
-                        configVariable: "3"
-                    }
-                })
+            pentair.change_if3_pump_program(_selectedDeviceId, selectedProgramID)
     
-            for key, value in account.get_tokens().items():
+            for key, value in pentair.get_tokens().items():
                 set_key(ENV_PATH, key.upper(), value)
 
 def password_login() -> Pentair:
@@ -168,28 +129,21 @@ def password_login() -> Pentair:
         username = input("Enter username: ")
     if not (password := PASSWORD):
         password = input("Enter password: ")
-    account = Pentair(username=username)
-    account.authenticate(password=password)
-    return account
+    pentair = Pentair(username=username)
+    pentair.authenticate(password=password)
+    return pentair
 
 
 def token_login() -> Pentair:
     """Login using tokens."""
-    account = Pentair(
+    pentair = Pentair(
         access_token=ACCESS_TOKEN, id_token=ID_TOKEN, refresh_token=REFRESH_TOKEN
     )
     try:
-        account.get_user()
+        pentair.get_user()
     except PentairAuthenticationError:
         return password_login()
-    return account
-
-def filterDevicesToIF3(devices: list) -> list:
-    filteredList = []
-    for item in devices:
-        if item['productInfo']['model'] == "IntelliFlo/Pro3 VSF":
-            filteredList.append(item)
-    return filteredList
+    return pentair
 
 parser = argparse.ArgumentParser(description="Login to Pentair Home and list devices.")
 parser.add_argument(
