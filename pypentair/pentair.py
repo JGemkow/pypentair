@@ -187,3 +187,65 @@ class Pentair:
     ) -> Any:
         """Make a put request."""
         return self.__request("put", url, data, **kwargs)
+    
+    def __filter_devices_to_iF3(self, devices: list) -> list:
+        filteredList = []
+        for item in devices:
+            if item['productInfo']['model'] == "IntelliFlo/Pro3 VSF":
+                filteredList.append(item)
+        return filteredList
+    
+    def get_if3_devices(self) -> list:
+        # Used to get filtered list of devices as only IF3 has been tested.
+        _devices = self.get_devices()
+        _filteredDevices = self.__filter_devices_to_iF3(_devices['data'])
+        return _filteredDevices
+    
+    def get_if3_pump(self, deviceId: str) -> Any:
+        _deviceFromAPI = self.get_device(deviceId)
+
+        _activeProgramNumber = int(_deviceFromAPI['data']['fields']['s14']['value'])
+        if _activeProgramNumber == 99:
+            # No active program
+            _activeProgramName = None
+        else:
+            _activeProgramName = _deviceFromAPI['data']['fields']['zp' + str((_activeProgramNumber+1)) + 'e2']['value']
+        _device = {
+            'deviceId': _deviceFromAPI['data']['deviceId'],
+            'nickName': _deviceFromAPI['data']['productInfo']['nickName'],
+            'model': _deviceFromAPI['data']['productInfo']['model'],
+            'activeProgramNumber': None if _activeProgramNumber == 99 else _activeProgramNumber + 1,
+            'activeProgramName': _activeProgramName,
+            'enabledPrograms': [],
+            'currentPowerConsumption': int(_deviceFromAPI['data']['fields']['s18']['value']),
+            'currentMotorSpeed': 0 if _deviceFromAPI['data']['fields']['s19']['value'] == "0" else (int(_deviceFromAPI['data']['fields']['s19']['value'])/10),
+            'currentEstimatedFlow': 0 if _deviceFromAPI['data']['fields']['s26']['value'] == "0" else (int(_deviceFromAPI['data']['fields']['s26']['value'])/10)
+        }
+
+        for i in range(1, 9):
+            if _deviceFromAPI['data']['fields']['zp' + str((i)) + 'e13']['value'] == "1":
+                _device['enabledPrograms'].append({
+                    'id': i,
+                    'name': _deviceFromAPI['data']['fields']['zp' + str((i)) + 'e2']['value']
+                })
+
+        return _device
+    
+    def change_if3_pump_program(self, deviceId: str, pumpProgramNumber: int) -> Any:
+        if (pumpProgramNumber == None or pumpProgramNumber == 0):
+            # Get current running program
+            pump = self.get_if3_pump(deviceId)
+            
+            configVariable = "zp" + str(pump['activeProgramNumber']) + "e10"
+            self.update_device(deviceId, {
+                "payload": {
+                    configVariable: "2"
+                }
+            })
+        else: 
+            configVariable = "zp" + str(pumpProgramNumber) + "e10"
+            self.update_device(deviceId, {
+                "payload": {
+                    configVariable: "3"
+                }
+            })
