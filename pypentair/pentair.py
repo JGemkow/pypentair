@@ -16,6 +16,7 @@ from pycognito import Cognito
 from .const import CLIENT_ID, IDENTITY_POOL_ID, REGION_NAME, USER_POOL_ID
 from .exceptions import PentairAuthenticationError
 from .utils import decode, redact
+import json as jsonLib
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -123,23 +124,46 @@ class Pentair:
     def get_devices(self) -> Any:
         """Get devices."""
         return self.__get("device/device-service/user/devices")
+    
+    def get_device(self, deviceId: str) -> Any:
+        """Get device."""
+        return self.__get("device/device-service/user/device/" + deviceId)
+    
+    def update_device(self, deviceId: str, data: Any) -> Any:
+        """Update device."""
+        return self.__put("device/device-service/user/device/" + deviceId, data)
 
-    def __request(self, method: str, url: str, **kwargs: Any) -> Any:
+    def __request(self, method: str, url: str, data: Any = None, **kwargs: Any) -> Any:
         """Make a request."""
-        _LOGGER.debug("Making %s request to %s with %s", method, url, redact(kwargs))
 
-        request = AWSRequest(
-            method=method,
-            url=urljoin(BASE_URL, url),
-            headers={"x-amz-id-token": self.id_token},
-        )
-        self.get_auth().add_auth(request)
-        prepped = request.prepare()
-        response = requests.request(
-            method, prepped.url, headers=prepped.headers, timeout=10, **kwargs
-        )
-
-        json = response.json()
+        if (data == None):
+            _LOGGER.debug("Making %s request to %s with %s", method, url, redact(kwargs))
+            request = AWSRequest(
+                method=method,
+                url=urljoin(BASE_URL, url),
+                headers={"x-amz-id-token": self.id_token},
+            )
+            self.get_auth().add_auth(request)
+            prepped = request.prepare()
+            response = requests.request(
+                method, prepped.url, headers=prepped.headers, timeout=10, **kwargs
+            )
+            json = response.json()
+        else:
+            jsonData=jsonLib.dumps(data)
+            _LOGGER.debug("Making %s request to %s with payload of %s and with %s", method, url, data, redact(kwargs))
+            request = AWSRequest(
+                method=method,
+                url=urljoin(BASE_URL, url),
+                headers={"x-amz-id-token": self.id_token},
+                data=jsonData
+            )
+            self.get_auth().add_auth(request)
+            prepped = request.prepare()
+            response = requests.request(
+                method, prepped.url, headers=prepped.headers, timeout=30, data=jsonData, **kwargs
+            )
+            json = response.json()
         _LOGGER.debug(
             "Received %s response from %s: %s", response.status_code, url, redact(json)
         )
@@ -157,3 +181,9 @@ class Pentair:
     ) -> Any:
         """Make a post request."""
         return self.__request("post", url, **kwargs)
+
+    def __put(  
+        self, url: str, data, **kwargs: Any
+    ) -> Any:
+        """Make a put request."""
+        return self.__request("put", url, data, **kwargs)
