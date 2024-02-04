@@ -93,11 +93,11 @@ async def main(keep_alive: bool = False) -> None:
                 monitorPasses += 1
 
             # Once monitor has completed five times, attempt a change
-            validProgramIDOptions = list(map(itemgetter('id'), device.enabledPrograms))
+            validProgramIDOptions = list(program.id for program in device.enabledPrograms)
             print("Testing pump change..")
             print("Current program is " + device.activeProgramName)
             print("Choose a new pump program to switch to:")
-            if device['activeProgramNumber'] != None:
+            if device.activeProgramNumber != None:
                 validProgramIDOptions.append(0)
                 print("0. Stop")
             for program in device.enabledPrograms:

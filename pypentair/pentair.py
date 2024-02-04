@@ -235,22 +235,7 @@ class Pentair:
         _deviceFromAPI = self.get_device(deviceId)
 
         _activeProgramNumber = int(_deviceFromAPI['data']['fields']['s14']['value'])
-        if _activeProgramNumber == 99:
-            # No active program
-            _activeProgramName = None
-        else:
-            _activeProgramName = _deviceFromAPI['data']['fields']['zp' + str((_activeProgramNumber+1)) + 'e2']['value']
-        _device = {
-            'deviceId': _deviceFromAPI['data']['deviceId'],
-            'nickName': _deviceFromAPI['data']['productInfo']['nickName'],
-            'model': _deviceFromAPI['data']['productInfo']['model'],
-            'activeProgramNumber': None if _activeProgramNumber == 99 else _activeProgramNumber + 1,
-            'activeProgramName': _activeProgramName,
-            'enabledPrograms': [],
-            'currentPowerConsumption': int(_deviceFromAPI['data']['fields']['s18']['value']),
-            'currentMotorSpeed': 0 if _deviceFromAPI['data']['fields']['s19']['value'] == "0" else (int(_deviceFromAPI['data']['fields']['s19']['value'])/10),
-            'currentEstimatedFlow': 0 if _deviceFromAPI['data']['fields']['s26']['value'] == "0" else (int(_deviceFromAPI['data']['fields']['s26']['value'])/10)
-        }
+        
         _device = PentairIF3Pump(
             deviceId=_deviceFromAPI['data']['deviceId'],
             nickName=_deviceFromAPI['data']['productInfo']['nickName'],
@@ -280,7 +265,7 @@ class Pentair:
             # Get current running program
             pump = self.get_if3_pump(deviceId)
             
-            configVariable = "zp" + str(pump['activeProgramNumber']) + "e10"
+            configVariable = "zp" + str(pump.activeProgramNumber) + "e10"
             self.update_device(deviceId, {
                 "payload": {
                     configVariable: "2"
