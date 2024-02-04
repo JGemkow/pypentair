@@ -46,7 +46,9 @@ async def main(keep_alive: bool = False) -> None:
         print("No compatible devices found on this account")
     else:
         print(str(_deviceCount) + " compatible device(s) found. Please select device to add to monitor\n")
+        print(_filteredDevices)
         for i in range(_deviceCount):
+            print(_filteredDevices[i].nickName)
             print(str(i+1) + ". " + _filteredDevices[i].nickName + " (" + _filteredDevices[i].model + ")")
 
         validSelection = False

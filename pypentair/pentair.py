@@ -25,14 +25,14 @@ BASE_URL: Final = "https://api.pentair.cloud/"
 
 class PentairDevice:
     def __init__(self, deviceId: int, nickName: str, model: str):
-        self.deviceId = deviceId
-        self.nickName = nickName,
-        self.model = model
+        self.deviceId: str = deviceId
+        self.nickName: str = nickName
+        self.model: str = model
 
 class PentairIF3PumpProgram:
     def __init__(self, id: int, name: str):
-        self.id = id
-        self.name = name
+        self.id: int = id
+        self.name: str = name
 
 class PentairIF3Pump:
     def __init__(self, deviceId: str ,nickName: str, model: str, activeProgramNumber: int | None, activeProgramName: str | None, 
@@ -213,14 +213,14 @@ class Pentair:
         return self.__request("put", url, data, **kwargs)
     
     def __filter_devices_to_iF3(self, devices: list) -> List[PentairDevice]:
-        filteredList = []
+        filteredList: List[PentairDevice] = []
         for item in devices:
             if item['productInfo']['model'] == "IntelliFlo/Pro3 VSF":
                 filteredList.append(
                     PentairDevice(
                         deviceId=item['deviceId'],
-                        nickName=item['productInfo']['nickName'],
-                        model=item['productInfo']['model']
+                        model=item['productInfo']['model'],
+                        nickName=item['productInfo']['nickName']
                     )
                 )
         return filteredList
