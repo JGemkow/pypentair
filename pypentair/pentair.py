@@ -1,5 +1,6 @@
 """Pentair account."""
 from __future__ import annotations
+from typing import List
 
 import logging
 from typing import Any, Final
@@ -22,6 +23,29 @@ _LOGGER = logging.getLogger(__name__)
 
 BASE_URL: Final = "https://api.pentair.cloud/"
 
+class PentairDevice:
+    def __init__(self, deviceId: int, nickName: str, model: str):
+        self.deviceId = deviceId
+        self.nickName = nickName,
+        self.model = model
+
+class PentairIF3PumpProgram:
+    def __init__(self, id: int, name: str):
+        self.id = id
+        self.name = name
+
+class PentairIF3Pump:
+    def __init__(self, deviceId: str ,nickName: str, model: str, activeProgramNumber: int | None, activeProgramName: str | None, 
+                 enabledPrograms: list, currentPowerConsumption: int, currentMotorSpeed: float, currentEstimatedFlow: float):
+        self.deviceId: str = deviceId
+        self.nickName: str = nickName
+        self.model: str = model
+        self.activeProgramNumber: int | None = activeProgramNumber
+        self.activeProgramName: str | None = activeProgramName
+        self.currentPowerConsumption: int = currentPowerConsumption
+        self.currentMotorSpeed: float = currentMotorSpeed
+        self.currentEstimatedFlow: float = currentEstimatedFlow
+        self.enabledPrograms: List[PentairIF3PumpProgram] = enabledPrograms
 
 class Pentair:
     """Pentair account."""
@@ -188,20 +212,26 @@ class Pentair:
         """Make a put request."""
         return self.__request("put", url, data, **kwargs)
     
-    def __filter_devices_to_iF3(self, devices: list) -> list:
+    def __filter_devices_to_iF3(self, devices: list) -> List[PentairDevice]:
         filteredList = []
         for item in devices:
             if item['productInfo']['model'] == "IntelliFlo/Pro3 VSF":
-                filteredList.append(item)
+                filteredList.append(
+                    PentairDevice(
+                        deviceId=item['deviceId'],
+                        nickName=item['productInfo']['nickName'],
+                        model=item['productInfo']['model']
+                    )
+                )
         return filteredList
     
-    def get_if3_devices(self) -> list:
+    def get_if3_devices(self) -> List[PentairDevice]:
         # Used to get filtered list of devices as only IF3 has been tested.
         _devices = self.get_devices()
         _filteredDevices = self.__filter_devices_to_iF3(_devices['data'])
         return _filteredDevices
     
-    def get_if3_pump(self, deviceId: str) -> Any:
+    def get_if3_pump(self, deviceId: str) -> PentairIF3Pump:
         _deviceFromAPI = self.get_device(deviceId)
 
         _activeProgramNumber = int(_deviceFromAPI['data']['fields']['s14']['value'])
@@ -221,17 +251,31 @@ class Pentair:
             'currentMotorSpeed': 0 if _deviceFromAPI['data']['fields']['s19']['value'] == "0" else (int(_deviceFromAPI['data']['fields']['s19']['value'])/10),
             'currentEstimatedFlow': 0 if _deviceFromAPI['data']['fields']['s26']['value'] == "0" else (int(_deviceFromAPI['data']['fields']['s26']['value'])/10)
         }
+        _device = PentairIF3Pump(
+            deviceId=_deviceFromAPI['data']['deviceId'],
+            nickName=_deviceFromAPI['data']['productInfo']['nickName'],
+            model=_deviceFromAPI['data']['productInfo']['model'],
+            activeProgramNumber= None if _activeProgramNumber == 99 else _activeProgramNumber + 1,
+            activeProgramName= None if _activeProgramNumber == 99 else _deviceFromAPI['data']['fields']['zp' + str((_activeProgramNumber+1)) + 'e2']['value'],
+            currentPowerConsumption=int(_deviceFromAPI['data']['fields']['s18']['value']),
+            currentMotorSpeed=0 if _deviceFromAPI['data']['fields']['s19']['value'] == "0" else (int(_deviceFromAPI['data']['fields']['s19']['value'])/10),
+            currentEstimatedFlow=0 if _deviceFromAPI['data']['fields']['s26']['value'] == "0" else (int(_deviceFromAPI['data']['fields']['s26']['value'])/10),
+            enabledPrograms=[]
+        )
 
+        # Loop through the 9 possible programs from the API body
         for i in range(1, 9):
             if _deviceFromAPI['data']['fields']['zp' + str((i)) + 'e13']['value'] == "1":
-                _device['enabledPrograms'].append({
-                    'id': i,
-                    'name': _deviceFromAPI['data']['fields']['zp' + str((i)) + 'e2']['value']
-                })
+                _device.enabledPrograms.append(
+                    PentairIF3PumpProgram(
+                        id=i,
+                        name=_deviceFromAPI['data']['fields']['zp' + str((i)) + 'e2']['value']
+                    )
+                )
 
         return _device
     
-    def change_if3_pump_program(self, deviceId: str, pumpProgramNumber: int) -> Any:
+    def change_if3_pump_program(self, deviceId: str, pumpProgramNumber: int) -> None:
         if (pumpProgramNumber == None or pumpProgramNumber == 0):
             # Get current running program
             pump = self.get_if3_pump(deviceId)

@@ -47,7 +47,7 @@ async def main(keep_alive: bool = False) -> None:
     else:
         print(str(_deviceCount) + " compatible device(s) found. Please select device to add to monitor\n")
         for i in range(_deviceCount):
-            print(str(i+1) + ". " + _filteredDevices[i]['productInfo']['nickName'] + " (" + _filteredDevices[i]['productInfo']['model'] + ")")
+            print(str(i+1) + ". " + _filteredDevices[i].nickName + " (" + _filteredDevices[i].model + ")")
 
         validSelection = False
         print("\n")
@@ -57,7 +57,7 @@ async def main(keep_alive: bool = False) -> None:
                 selection = int(selection)
                 if selection in range(1, _deviceCount+1):
                     validSelection = True
-                    _selectedDeviceId = _filteredDevices[i-1]['deviceId']
+                    _selectedDeviceId = _filteredDevices[i-1].deviceId
                 else: 
                     print("Invalid choice.\n")
                     validSelection = False
@@ -92,14 +92,14 @@ async def main(keep_alive: bool = False) -> None:
                 monitorPasses += 1
 
             # Once monitor has completed five times, attempt a change
-            validProgramIDOptions = list(map(itemgetter('id'), device['enabledPrograms']))
+            validProgramIDOptions = list(map(itemgetter('id'), device.enabledPrograms))
             print("Testing pump change..")
             print("Choose a new pump program to switch to:")
             if device['activeProgramNumber'] != None:
                 validProgramIDOptions.append(0)
                 print("0. Stop")
-            for program in device['enabledPrograms']:
-                print(str(program['id']) + ". " + program['name'])
+            for program in device.enabledPrograms:
+                print(str(program.id) + ". " + program.name)
 
             print("\n")
             validSelection = False
