@@ -108,7 +108,9 @@ async def main(keep_alive: bool = False) -> None:
             validProgramIDOptions = list(program.id for program in device.enabledPrograms)
             print("Testing pump change..")
             print("Choose a new pump program to switch to:")
-            if device.activeProgramNumber != None:
+
+            # If device is active and not in thermal mode (14)
+            if device.activeProgramNumber != None and device.activeProgramNumber != 14:
                 validProgramIDOptions.append(0)
                 print("0. Stop")
             for program in device.enabledPrograms:
