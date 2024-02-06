@@ -24,9 +24,10 @@ _LOGGER = logging.getLogger(__name__)
 BASE_URL: Final = "https://api.pentair.cloud/"
 
 class PentairDevice:
-    def __init__(self, deviceId: int, nickName: str, deviceType: str, model: str, softwareVersion: str):
+    def __init__(self, deviceId: int, nickName: str, deviceType: str, maker: str, model: str, softwareVersion: str):
         self.deviceId: str = deviceId
         self.nickName: str = nickName
+        self.maker: str = maker
         self.model: str = model
         self.deviceType: str = deviceType
         self.softwareVersion: str = softwareVersion
@@ -37,9 +38,9 @@ class PentairIF3PumpProgram:
         self.name: str = name
 
 class PentairIF3Pump(PentairDevice):
-    def __init__(self, deviceId: str ,nickName: str, deviceType: str, model: str, softwareVersion:str, activeProgramNumber: int | None, activeProgramName: str | None, 
+    def __init__(self, deviceId: str, nickName: str, deviceType: str, maker:str, model: str, softwareVersion:str, activeProgramNumber: int | None, activeProgramName: str | None, 
                  enabledPrograms: list, currentPowerConsumption: int, currentMotorSpeed: float, currentEstimatedFlow: float):
-        PentairDevice.__init__(self, deviceId, nickName, deviceType, model, softwareVersion)
+        PentairDevice.__init__(self, deviceId, nickName, deviceType, maker, model, softwareVersion)
 
         self.activeProgramNumber: int | None = activeProgramNumber
         self.activeProgramName: str | None = activeProgramName
@@ -154,9 +155,10 @@ class Pentair:
             devices.append(
                 PentairDevice(
                     deviceId=item['deviceId'],
-                    model=item['productInfo']['model'],
                     nickName=item['productInfo']['nickName'],
                     deviceType=item['deviceType'],
+                    maker=item['productInfo']['maker'],
+                    model=item['productInfo']['model'],
                     softwareVersion=item['currentFWVersion']
                 )
             )
@@ -174,6 +176,7 @@ class Pentair:
                     deviceId=rawDeviceFromAPI['data']['deviceId'],
                     nickName=rawDeviceFromAPI['data']['productInfo']['nickName'],
                     deviceType=rawDeviceFromAPI['data']['deviceType'],
+                    maker=rawDeviceFromAPI['data']['productInfo']['maker'],
                     model=rawDeviceFromAPI['data']['productInfo']['model'],
                     softwareVersion=rawDeviceFromAPI['data']['fwVersion'],
                     activeProgramNumber= None if activeProgramNumber == 99 else activeProgramNumber + 1,
