@@ -52,6 +52,22 @@ class PentairIF3Pump(PentairDevice):
         self.currentEstimatedFlow: float = currentEstimatedFlow
         self.enabledPrograms: List[PentairIF3PumpProgram] = enabledPrograms
 
+class PentairSaltLevelSensor(PentairDevice):
+    def __init__(self, deviceId: str, nickName: str, deviceType: str, maker:str, model: str, softwareVersion:str, lastReport: datetime,
+                averageSaltUsagePerDay: float, batteryLevel: float, saltLevel: int):
+        PentairDevice.__init__(self, deviceId, nickName, deviceType, maker, model, softwareVersion, lastReport)
+
+        self.averageSaltUsagePerDay: float  = averageSaltUsagePerDay
+        self.batteryLevel: float = batteryLevel
+        self.saltLevel: int = saltLevel
+
+class PentairSumpPumpBatteryBackup(PentairDevice):
+    def __init__(self, deviceId: str, nickName: str, deviceType: str, maker:str, model: str, softwareVersion:str, lastReport: datetime,
+                batteryLevel: float):
+        PentairDevice.__init__(self, deviceId, nickName, deviceType, maker, model, softwareVersion, lastReport)
+
+        self.batteryLevel: float = batteryLevel
+
 class Pentair:
     """Pentair account."""
 
@@ -202,6 +218,30 @@ class Pentair:
                             )
                         )
 
+                return device
+            case "PPA0":
+                device = PentairSumpPumpBatteryBackup(
+                    deviceId=rawDeviceFromAPI['data']['deviceId'],
+                    nickName=rawDeviceFromAPI['data']['productInfo']['nickName'],
+                    deviceType=rawDeviceFromAPI['data']['deviceType'],
+                    model=rawDeviceFromAPI['data']['productInfo']['model'],
+                    softwareVersion=rawDeviceFromAPI['data']['fwVersion'],
+                    lastReport=rawDeviceFromAPI['data']['timestamp'],
+                    batteryLevel=min(int(rawDeviceFromAPI['data']['fields']['bvl']) * 100 / 8, 100)
+                )
+                return device
+            case "SSS1":
+                device = PentairSaltLevelSensor(
+                    deviceId=rawDeviceFromAPI['data']['deviceId'],
+                    nickName=rawDeviceFromAPI['data']['productInfo']['nickName'],
+                    deviceType=rawDeviceFromAPI['data']['deviceType'],
+                    model=rawDeviceFromAPI['data']['productInfo']['model'],
+                    softwareVersion=rawDeviceFromAPI['data']['fwVersion'],
+                    lastReport=rawDeviceFromAPI['data']['timestamp'],
+                    averageSaltUsagePerDay=float(rawDeviceFromAPI['data']['fields']['average_salt_usage_per_day']),
+                    batteryLevel=float(rawDeviceFromAPI['data']['fields']['battery_level']),
+                    saltLevel=int(rawDeviceFromAPI['data']['fields']['salt_level'])
+                )
                 return device
             case _:
                 device = PentairDevice(
