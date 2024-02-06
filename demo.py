@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import datetime
+import json
 import logging
 from operator import itemgetter
 import os
@@ -12,6 +14,7 @@ from deepdiff import DeepDiff
 from dotenv import set_key
 
 from pypentair import Pentair, PentairAuthenticationError
+from pypentair.pentair import PentairIF3Pump
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -38,17 +41,18 @@ async def main(keep_alive: bool = False) -> None:
         set_key(ENV_PATH, key.upper(), value)
 
     # Get devices
-    _selectedDeviceId = None
-    _filteredDevices = pentair.get_if3_devices()
+    selectedDeviceId = None
+    devices = pentair.get_devices()
+    filteredDevices = [device for device in devices if device.deviceType == "IF31"]
 
-    _deviceCount = len(_filteredDevices)
-    if _deviceCount == 0:
+    deviceCount = len(filteredDevices)
+    if deviceCount == 0:
         print("No compatible devices found on this account")
     else:
-        print(str(_deviceCount) + " compatible device(s) found. Please select device to add to monitor\n")
-        print(_filteredDevices)
-        for i in range(_deviceCount):
-            print(str(i+1) + ". " + _filteredDevices[i].nickName + " (" + _filteredDevices[i].model + ")")
+        print(str(deviceCount) + " compatible device(s) found. Please select device to add to monitor\n")
+        print(filteredDevices)
+        for i in range(deviceCount):
+            print(str(i+1) + ". " + filteredDevices[i].nickName + " (" + filteredDevices[i].model + ")")
 
         validSelection = False
         print("\n")
@@ -56,9 +60,9 @@ async def main(keep_alive: bool = False) -> None:
             selection = input("Please select a device by number in the list: ")
             try:
                 selection = int(selection)
-                if selection in range(1, _deviceCount+1):
+                if selection in range(1, deviceCount+1):
                     validSelection = True
-                    _selectedDeviceId = _filteredDevices[i-1].deviceId
+                    selectedDeviceId = filteredDevices[i-1].deviceId
                 else: 
                     print("Invalid choice.\n")
                     validSelection = False
@@ -66,25 +70,33 @@ async def main(keep_alive: bool = False) -> None:
                 print("Invalid choice.")
                 validSelection = False
 
-    if _selectedDeviceId != None:
+    if selectedDeviceId != None:
         while True:
-            device = {}
             monitorPasses = 0
-            while monitorPasses < 5:
+            while monitorPasses < 2:
                 try:
                     # Compare single device
-                    _device = pentair.get_if3_pump(_selectedDeviceId)
+                    deviceFromAPI: PentairIF3Pump = pentair.get_device(selectedDeviceId)
 
-                    diff = DeepDiff(
-                        device,
-                        _device,
-                        ignore_order=True,
-                        report_repetition=True
-                    )
+                    if monitorPasses != 0:
+                        diff = DeepDiff(
+                            device,
+                            deviceFromAPI,
+                            ignore_order=True,
+                            report_repetition=True
+                        )
+                        
+                        logging.debug(diff if diff else "No changes")
                     
-                    logging.debug(diff if diff else "No changes")
-                    device = _device
-                    print(_device)
+                    current_time = datetime.datetime.now()
+                    print("UTC Time:", current_time)  
+                    if deviceFromAPI.activeProgramName is None:
+                        print("No running program at the moment.")
+                    else:
+                        print("Current program is " + deviceFromAPI.activeProgramName)
+                    print("Current power consumption is " + str(deviceFromAPI.currentPowerConsumption))
+                    print("Current estimated flow is " + str(deviceFromAPI.currentEstimatedFlow))
+                    device = deviceFromAPI
                 except Exception as ex:  # pylint: disable=broad-except
                     logging.error(ex)
                 if not keep_alive:
@@ -95,7 +107,6 @@ async def main(keep_alive: bool = False) -> None:
             # Once monitor has completed five times, attempt a change
             validProgramIDOptions = list(program.id for program in device.enabledPrograms)
             print("Testing pump change..")
-            print("Current program is " + device.activeProgramName)
             print("Choose a new pump program to switch to:")
             if device.activeProgramNumber != None:
                 validProgramIDOptions.append(0)
@@ -120,7 +131,7 @@ async def main(keep_alive: bool = False) -> None:
                 print("Stopping current program.")
             else:
                 print("Switching to program " + str(selectedProgramID))
-            pentair.change_if3_pump_program(_selectedDeviceId, selectedProgramID)
+            pentair.change_active_pump_program(device, selectedProgramID)
     
             for key, value in pentair.get_tokens().items():
                 set_key(ENV_PATH, key.upper(), value)
