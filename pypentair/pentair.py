@@ -1,5 +1,7 @@
 """Pentair account."""
 from __future__ import annotations
+from datetime import datetime, timezone
+from time import time
 from typing import List
 
 import logging
@@ -24,13 +26,14 @@ _LOGGER = logging.getLogger(__name__)
 BASE_URL: Final = "https://api.pentair.cloud/"
 
 class PentairDevice:
-    def __init__(self, deviceId: int, nickName: str, deviceType: str, maker: str, model: str, softwareVersion: str):
+    def __init__(self, deviceId: int, nickName: str, deviceType: str, maker: str, model: str, softwareVersion: str, lastReport: datetime):
         self.deviceId: str = deviceId
         self.nickName: str = nickName
         self.maker: str = maker
         self.model: str = model
         self.deviceType: str = deviceType
         self.softwareVersion: str = softwareVersion
+        self.lastReport: datetime = lastReport
 
 class PentairIF3PumpProgram:
     def __init__(self, id: int, name: str):
@@ -38,9 +41,9 @@ class PentairIF3PumpProgram:
         self.name: str = name
 
 class PentairIF3Pump(PentairDevice):
-    def __init__(self, deviceId: str, nickName: str, deviceType: str, maker:str, model: str, softwareVersion:str, activeProgramNumber: int | None, activeProgramName: str | None, 
+    def __init__(self, deviceId: str, nickName: str, deviceType: str, maker:str, model: str, softwareVersion:str, lastReport: datetime, activeProgramNumber: int | None, activeProgramName: str | None, 
                  enabledPrograms: list, currentPowerConsumption: int, currentMotorSpeed: float, currentEstimatedFlow: float):
-        PentairDevice.__init__(self, deviceId, nickName, deviceType, maker, model, softwareVersion)
+        PentairDevice.__init__(self, deviceId, nickName, deviceType, maker, model, softwareVersion, lastReport)
 
         self.activeProgramNumber: int | None = activeProgramNumber
         self.activeProgramName: str | None = activeProgramName
@@ -159,7 +162,8 @@ class Pentair:
                     deviceType=item['deviceType'],
                     maker=item['productInfo']['maker'],
                     model=item['productInfo']['model'],
-                    softwareVersion=item['currentFWVersion']
+                    softwareVersion=item['currentFWVersion'],
+                    lastReport=self.__convert_timestamp(_ts=item['lastReport'])
                 )
             )
         return devices
@@ -179,6 +183,7 @@ class Pentair:
                     maker=rawDeviceFromAPI['data']['productInfo']['maker'],
                     model=rawDeviceFromAPI['data']['productInfo']['model'],
                     softwareVersion=rawDeviceFromAPI['data']['fwVersion'],
+                    lastReport=self.__convert_timestamp(_ts=float(rawDeviceFromAPI['data']['timestamp'])),
                     activeProgramNumber= None if activeProgramNumber == 99 else activeProgramNumber + 1,
                     activeProgramName= None if activeProgramNumber == 99 else rawDeviceFromAPI['data']['fields']['zp' + str((activeProgramNumber+1)) + 'e2']['value'],
                     currentPowerConsumption=int(rawDeviceFromAPI['data']['fields']['s18']['value']),
@@ -204,7 +209,8 @@ class Pentair:
                     nickName=rawDeviceFromAPI['data']['productInfo']['nickName'],
                     deviceType=rawDeviceFromAPI['data']['deviceType'],
                     model=rawDeviceFromAPI['data']['productInfo']['model'],
-                    softwareVersion=rawDeviceFromAPI['data']['currentFWVersion'],
+                    softwareVersion=rawDeviceFromAPI['data']['fwVersion'],
+                    lastReport=rawDeviceFromAPI['data']['timestamp']
                 )
                 return device
 
@@ -277,3 +283,8 @@ class Pentair:
     ) -> Any:
         """Make a put request."""
         return self.__request("put", url, data, **kwargs)
+
+    def __convert_timestamp(self, _ts: float) -> datetime:
+        """Convert a timestamp to a datetime."""
+        return datetime.fromtimestamp(_ts / (1000 if _ts > time() else 1), timezone.utc)
+
