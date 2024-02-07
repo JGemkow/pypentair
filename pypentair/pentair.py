@@ -63,11 +63,17 @@ class PentairSaltLevelSensor(PentairDevice):
 
 class PentairSumpPumpBatteryBackup(PentairDevice):
     def __init__(self, deviceId: str, nickName: str, deviceType: str, maker:str, model: str, softwareVersion:str, lastReport: datetime,
-                batteryLevel: float):
+                batteryLevel: float, lowBattery: bool, batteryCharging: bool, online: bool, power: bool, primaryPump: bool, secondaryPump: bool, waterLevel: bool):
         PentairDevice.__init__(self, deviceId, nickName, deviceType, maker, model, softwareVersion, lastReport)
 
         self.batteryLevel: float = batteryLevel
-
+        self.lowBattery: bool = lowBattery
+        self.batteryCharging: bool = batteryCharging
+        self.online: bool = online
+        self.power: bool = power
+        self.primaryPump: bool = primaryPump
+        self.secondaryPump: bool = secondaryPump
+        self.waterLevel: bool = waterLevel
 class Pentair:
     """Pentair account."""
 
@@ -227,7 +233,14 @@ class Pentair:
                     model=rawDeviceFromAPI['data']['productInfo']['model'],
                     softwareVersion=rawDeviceFromAPI['data']['fwVersion'],
                     lastReport=rawDeviceFromAPI['data']['timestamp'],
-                    batteryLevel=min(int(rawDeviceFromAPI['data']['fields']['bvl']) * 100 / 8, 100)
+                    batteryLevel=min(int(rawDeviceFromAPI['data']['fields']['bvl']) * 100 / 8, 100),
+                    lowBattery=int(rawDeviceFromAPI['data']['bvl']) < 3 or rawDeviceFromAPI['data']['bft'] == "4",
+                    batteryCharging=rawDeviceFromAPI['data']['fields']['bch'] != "2",
+                    online=rawDeviceFromAPI['data']['fields']['online'],
+                    power=rawDeviceFromAPI['data']['fields']['acp']=="1",
+                    primaryPump=rawDeviceFromAPI['data']['fields']['sts']=="2",
+                    secondaryPump=int(rawDeviceFromAPI['data']['fields']['sts'])>0,
+                    waterLevel=rawDeviceFromAPI['data']['fields']['sts']=="5"
                 )
                 return device
             case "SSS1":
